@@ -51,9 +51,6 @@ CREATE TABLE IF NOT EXISTS apis (
     lifecycle_status VARCHAR(20) DEFAULT 'CREATED',
     has_thumbnail BOOLEAN DEFAULT FALSE,
     is_default_version BOOLEAN DEFAULT FALSE,
-    is_revision BOOLEAN DEFAULT FALSE,
-    revisioned_api_id VARCHAR(40),
-    revision_id INTEGER DEFAULT 0,
     type VARCHAR(20) DEFAULT 'HTTP',
     transport VARCHAR(255), -- JSON array as TEXT
     security_enabled BOOLEAN,
@@ -217,6 +214,38 @@ CREATE TABLE IF NOT EXISTS policies (
     execution_condition VARCHAR(512),
     version VARCHAR(50) NOT NULL DEFAULT '1.0.0',
     FOREIGN KEY (operation_id) REFERENCES api_operations(id)
+);
+
+-- API Deployments table (immutable deployment artifacts)
+CREATE TABLE IF NOT EXISTS api_deployments (
+    deployment_id VARCHAR(40) PRIMARY KEY,
+    api_uuid VARCHAR(40) NOT NULL,
+    organization_uuid VARCHAR(40) NOT NULL,
+    gateway_uuid VARCHAR(40) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'DEPLOYED',
+    base_deployment_id VARCHAR(40), -- Reference to the deployment used as base, NULL if based on "current"
+    content BLOB NOT NULL, -- Immutable deployment artifact (API spec + config)
+    metadata TEXT, -- JSON object for flexible key-value metadata
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (api_uuid) REFERENCES apis(uuid) ON DELETE CASCADE,
+    FOREIGN KEY (organization_uuid) REFERENCES organizations(uuid) ON DELETE CASCADE,
+    FOREIGN KEY (gateway_uuid) REFERENCES gateways(uuid) ON DELETE CASCADE,
+    CHECK (status IN ('DEPLOYED', 'UNDEPLOYED'))
+);
+
+-- API Associations table (for both gateways and dev portals)
+CREATE TABLE IF NOT EXISTS api_associations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    api_uuid VARCHAR(40) NOT NULL,
+    organization_uuid VARCHAR(40) NOT NULL,
+    resource_uuid VARCHAR(40) NOT NULL,
+    association_type VARCHAR(20) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (api_uuid) REFERENCES apis(uuid) ON DELETE CASCADE,
+    FOREIGN KEY (organization_uuid) REFERENCES organizations(uuid) ON DELETE CASCADE,
+    UNIQUE(api_uuid, resource_uuid, association_type, organization_uuid),
+    CHECK (association_type IN ('gateway', 'dev_portal'))
 );
 
 -- Gateways table (scoped to organizations)
