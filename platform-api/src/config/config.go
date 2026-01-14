@@ -47,6 +47,9 @@ type Server struct {
 
 	// TLS configurations
 	TLS TLS `envconfig:"TLS"`
+
+	// Deployment configurations
+	Deployments Deployments `envconfig:"DEPLOYMENTS"`
 }
 
 // TLS holds TLS certificate configuration
@@ -104,6 +107,11 @@ type DefaultDevPortal struct {
 	AdminRole             string `envconfig:"ADMIN_ROLE" default:"admin"`
 	SubscriberRole        string `envconfig:"SUBSCRIBER_ROLE" default:"Internal/subscriber"`
 	SuperAdminRole        string `envconfig:"SUPER_ADMIN_ROLE" default:"superAdmin"`
+}
+
+// Deployments holds deployment-specific configuration
+type Deployments struct {
+	MaxPerAPIGateway int `envconfig:"MAX_PER_API_GATEWAY" default:"20"`
 }
 
 // package-level variable and mutex for thread safety
