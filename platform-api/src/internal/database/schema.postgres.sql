@@ -219,6 +219,25 @@ CREATE TABLE IF NOT EXISTS policies (
     FOREIGN KEY (operation_id) REFERENCES api_operations(id)
 );
 
+-- Gateways table (scoped to organizations)
+-- Must be created before api_deployments which references it
+CREATE TABLE IF NOT EXISTS gateways (
+    uuid VARCHAR(40) PRIMARY KEY,
+    organization_uuid VARCHAR(40) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    display_name VARCHAR(255) NOT NULL,
+    description VARCHAR(1023),
+    vhost VARCHAR(255) NOT NULL,
+    is_critical BOOLEAN DEFAULT FALSE,
+    gateway_functionality_type VARCHAR(20) DEFAULT 'regular' NOT NULL,
+    is_active BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (organization_uuid) REFERENCES organizations(uuid) ON DELETE CASCADE,
+    UNIQUE(organization_uuid, name),
+    CHECK (gateway_functionality_type IN ('regular', 'ai', 'event'))
+);
+
 -- API Deployments table (immutable deployment artifacts)
 CREATE TABLE IF NOT EXISTS api_deployments (
     deployment_id VARCHAR(40) PRIMARY KEY,
@@ -249,25 +268,6 @@ CREATE TABLE IF NOT EXISTS api_associations (
     FOREIGN KEY (organization_uuid) REFERENCES organizations(uuid) ON DELETE CASCADE,
     UNIQUE(api_uuid, resource_uuid, association_type, organization_uuid),
     CHECK (association_type IN ('gateway', 'dev_portal'))
-);
-
--- Gateways table (scoped to organizations)
--- Must be created before api_deployments which references it
-CREATE TABLE IF NOT EXISTS gateways (
-    uuid VARCHAR(40) PRIMARY KEY,
-    organization_uuid VARCHAR(40) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    display_name VARCHAR(255) NOT NULL,
-    description VARCHAR(1023),
-    vhost VARCHAR(255) NOT NULL,
-    is_critical BOOLEAN DEFAULT FALSE,
-    gateway_functionality_type VARCHAR(20) DEFAULT 'regular' NOT NULL,
-    is_active BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (organization_uuid) REFERENCES organizations(uuid) ON DELETE CASCADE,
-    UNIQUE(organization_uuid, name),
-    CHECK (gateway_functionality_type IN ('regular', 'ai', 'event'))
 );
 
 -- Gateway Tokens table
