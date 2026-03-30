@@ -292,6 +292,15 @@ type RouterConfig struct {
 type RouterUpstream struct {
 	TLS      UpstreamTLS      `koanf:"tls"`
 	Timeouts UpstreamTimeouts `koanf:"timeouts"`
+	// DNS configures optional UDP DNS servers for Envoy STRICT_DNS (c-ares). When empty,
+	// Envoy uses /etc/resolv.conf (often Docker 127.0.0.11), which may omit AAAA answers.
+	DNS UpstreamDNS `koanf:"dns"`
+}
+
+// UpstreamDNS holds resolver addresses for upstream hostname resolution in Envoy.
+type UpstreamDNS struct {
+	// Resolvers are UDP DNS endpoints as "host:port" (port defaults to 53 if omitted).
+	Resolvers []string `koanf:"resolvers"`
 }
 
 // UpstreamTLS holds TLS configuration for upstream connections.

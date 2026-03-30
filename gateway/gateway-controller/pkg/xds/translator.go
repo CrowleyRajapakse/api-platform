@@ -1380,7 +1380,7 @@ func (t *Translator) createDynamicFwdListenerForWebSubHub(isHTTPS bool) (*listen
 		HostTtl: durationpb.New(300 * time.Second),
 
 		// Optional: which DNS families to use (AUTO, V4_ONLY, V6_ONLY)
-		DnsLookupFamily: cluster.Cluster_V4_ONLY,
+		DnsLookupFamily: cluster.Cluster_ALL,
 
 		MaxHosts: &wrapperspb.UInt32Value{Value: 1024},
 	}
@@ -1989,6 +1989,43 @@ func (t *Translator) createRoutePerTopic(apiId, apiName, apiVersion, context, me
 	return r
 }
 
+// upstreamDNSResolutionConfig returns Envoy STRICT_DNS resolver config when router.upstream.dns.resolvers is set.
+func (t *Translator) upstreamDNSResolutionConfig() *core.DnsResolutionConfig {
+	specs := t.routerConfig.Upstream.DNS.Resolvers
+	if len(specs) == 0 {
+		return nil
+	}
+	addrs := make([]*core.Address, 0, len(specs))
+	for _, spec := range specs {
+		host := spec
+		portStr := "53"
+		if h, p, err := net.SplitHostPort(spec); err == nil {
+			host = h
+			portStr = p
+		}
+		portNum, err := strconv.ParseUint(portStr, 10, 32)
+		if err != nil || portNum == 0 || portNum > 65535 {
+			t.logger.Warn("skipping invalid upstream DNS resolver", slog.String("resolver", spec))
+			continue
+		}
+		addrs = append(addrs, &core.Address{
+			Address: &core.Address_SocketAddress{
+				SocketAddress: &core.SocketAddress{
+					Protocol: core.SocketAddress_UDP,
+					Address:  host,
+					PortSpecifier: &core.SocketAddress_PortValue{
+						PortValue: uint32(portNum),
+					},
+				},
+			},
+		})
+	}
+	if len(addrs) == 0 {
+		return nil
+	}
+	return &core.DnsResolutionConfig{Resolvers: addrs}
+}
+
 // createCluster creates an Envoy cluster
 func (t *Translator) createCluster(
 	name string,
@@ -2012,6 +2049,8 @@ func (t *Translator) createCluster(
 		Name:                 name,
 		ConnectTimeout:       durationpb.New(effectiveConnectTimeout),
 		ClusterDiscoveryType: &cluster.Cluster_Type{Type: cluster.Cluster_STRICT_DNS},
+		// Include AAAA so IPv6-only hostnames resolve (otherwise 503 UH).
+		DnsLookupFamily: cluster.Cluster_ALL,
 		LoadAssignment: &endpoint.ClusterLoadAssignment{
 			ClusterName: name,
 			Endpoints:   endpoints,
@@ -2020,6 +2059,10 @@ func (t *Translator) createCluster(
 
 	if transportSocketMatch != nil {
 		c.TransportSocketMatches = []*cluster.Cluster_TransportSocketMatch{transportSocketMatch}
+	}
+
+	if drc := t.upstreamDNSResolutionConfig(); drc != nil {
+		c.DnsResolutionConfig = drc
 	}
 
 	return c
@@ -2159,6 +2202,10 @@ func (t *Translator) createPolicyEngineCluster() *cluster.Cluster {
 		}
 	}
 
+	if policyEngine.Mode == "tcp" {
+		c.DnsLookupFamily = cluster.Cluster_ALL
+	}
+
 	return c
 }
 
@@ -2211,7 +2258,7 @@ func (t *Translator) createALSCluster() *cluster.Cluster {
 		clusterType = cluster.Cluster_STRICT_DNS
 	}
 
-	return &cluster.Cluster{
+	alsCluster := &cluster.Cluster{
 		Name:                 constants.GRPCAccessLogClusterName,
 		ConnectTimeout:       durationpb.New(5 * time.Second),
 		ClusterDiscoveryType: &cluster.Cluster_Type{Type: clusterType},
@@ -2223,6 +2270,10 @@ func (t *Translator) createALSCluster() *cluster.Cluster {
 		// Enable HTTP/2 for gRPC
 		Http2ProtocolOptions: &core.Http2ProtocolOptions{},
 	}
+	if clusterType == cluster.Cluster_STRICT_DNS {
+		alsCluster.DnsLookupFamily = cluster.Cluster_ALL
+	}
+	return alsCluster
 }
 
 // createOTELCollectorCluster creates an Envoy cluster for OpenTelemetry collector
@@ -2284,6 +2335,7 @@ func (t *Translator) createOTELCollectorCluster() *cluster.Cluster {
 		Name:                 OTELCollectorClusterName,
 		ConnectTimeout:       durationpb.New(5 * time.Second),
 		ClusterDiscoveryType: &cluster.Cluster_Type{Type: cluster.Cluster_STRICT_DNS},
+		DnsLookupFamily:      cluster.Cluster_ALL,
 		LbPolicy:             cluster.Cluster_ROUND_ROBIN,
 		LoadAssignment: &endpoint.ClusterLoadAssignment{
 			ClusterName: OTELCollectorClusterName,
@@ -2346,6 +2398,7 @@ func (t *Translator) createSDSCluster() *cluster.Cluster {
 		Name:                 "sds_cluster",
 		ConnectTimeout:       durationpb.New(5 * time.Second),
 		ClusterDiscoveryType: &cluster.Cluster_Type{Type: cluster.Cluster_STRICT_DNS},
+		DnsLookupFamily:      cluster.Cluster_ALL,
 		LbPolicy:             cluster.Cluster_ROUND_ROBIN,
 		LoadAssignment: &endpoint.ClusterLoadAssignment{
 			ClusterName: "sds_cluster",

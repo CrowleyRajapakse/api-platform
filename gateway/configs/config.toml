@@ -10,6 +10,10 @@ application_id = "<MOESIF_APPLICATION_ID>"
 [router]
 gateway_host = "*"
 
+# Public DNS helps Envoy resolve AAAA for IPv6-only upstreams when Docker’s resolver does not.
+[router.upstream.dns]
+resolvers = ["8.8.8.8:53", "1.1.1.1:53"]
+
 [router.access_logs]
 enabled = true
 

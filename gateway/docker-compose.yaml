@@ -201,3 +201,7 @@ volumes:
 networks:
   gateway-network:
     driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: "fd00:10:20:30::/64"

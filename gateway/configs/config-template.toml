@@ -179,6 +179,10 @@ route_timeout_ms = 60000
 route_idle_timeout_ms = 300000
 connect_timeout_ms = 5000
 
+# Optional: UDP DNS resolvers for Envoy STRICT_DNS (improves AAAA resolution when using Docker embedded DNS).
+# [router.upstream.dns]
+# resolvers = ["8.8.8.8:53", "1.1.1.1:53"]
+
 [router.http_listener]
 server_header_transformation = "OVERWRITE"
 server_header_value = "WSO2 API Platform"
