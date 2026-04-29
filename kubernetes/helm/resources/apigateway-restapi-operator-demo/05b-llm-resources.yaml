@@ -1,0 +1,55 @@
+apiVersion: gateway.api-platform.wso2.com/v1alpha1
+kind: LlmProviderTemplate
+metadata:
+  name: demo-llm-template
+  namespace: apigateway-demo
+  labels:
+    gateway.api-platform.wso2.com/restapi-target: wso2-crd
+spec:
+  displayName: demo-llm-template
+  promptTokens:
+    identifier: usage.prompt_tokens
+    location: payload
+  completionTokens:
+    identifier: usage.completion_tokens
+    location: payload
+  totalTokens:
+    identifier: usage.total_tokens
+    location: payload
+---
+apiVersion: gateway.api-platform.wso2.com/v1alpha1
+kind: LlmProvider
+metadata:
+  name: demo-llm-provider
+  namespace: apigateway-demo
+  labels:
+    gateway.api-platform.wso2.com/restapi-target: wso2-crd
+spec:
+  displayName: demo-llm-provider
+  version: v1.0
+  template: demo-llm-template
+  accessControl:
+    mode: allow_all
+  upstream:
+    url: https://example-llm-upstream.invalid
+    auth:
+      type: api-key
+      header: Authorization
+      value:
+        valueFrom:
+          secretKeyRef:
+            name: demo-management-secrets
+            key: provider-token
+---
+apiVersion: gateway.api-platform.wso2.com/v1alpha1
+kind: LlmProxy
+metadata:
+  name: demo-llm-proxy
+  namespace: apigateway-demo
+  labels:
+    gateway.api-platform.wso2.com/restapi-target: wso2-crd
+spec:
+  displayName: demo-llm-proxy
+  version: v1.0
+  provider:
+    id: demo-llm-provider

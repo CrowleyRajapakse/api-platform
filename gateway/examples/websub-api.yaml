@@ -1,0 +1,45 @@
+# --------------------------------------------------------------------
+# Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+# --------------------------------------------------------------------
+
+# A WebSubApi exposes a webhook fan-out gateway with subscriber management.
+# The operator pushes the same payload to /websub-apis/{name} as a YAML
+# envelope, mirroring the RestApi flow.
+apiVersion: gateway.api-platform.wso2.com/v1alpha1
+kind: WebSubApi
+metadata:
+  name: order-events-v1.0
+spec:
+  displayName: Order Events
+  version: v1.0
+  context: /events/orders
+  hub:
+    channels:
+      - name: orders.created
+      - name: orders.shipped
+        policies:
+          - name: rbac
+            version: v1
+            params:
+              roles:
+                - subscriber
+    policies:
+      - name: api-key-auth
+        version: v1
+        params:
+          key: X-API-Key
+          in: header
+  receiver:
+    policies:
+      - name: hmac-validation
+        version: v1
+  delivery:
+    policies:
+      - name: hmac-signing
+        version: v1

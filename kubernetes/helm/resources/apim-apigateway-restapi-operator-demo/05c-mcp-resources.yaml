@@ -1,0 +1,34 @@
+apiVersion: gateway.api-platform.wso2.com/v1alpha1
+kind: Mcp
+metadata:
+  name: demo-mcp-apim
+  namespace: apigateway-demo-apim
+  labels:
+    gateway.api-platform.wso2.com/restapi-target: wso2-crd-apim
+spec:
+  displayName: demo-mcp-apim
+  version: v1.0
+  context: /mcp-demo-apim
+  specVersion: "2025-03-26"
+  upstream:
+    url: https://example-mcp-upstream.invalid
+  prompts:
+    - name: summarize-order
+      title: Summarize order
+      description: Summarize order details for an operations agent
+      arguments:
+        - name: orderId
+          description: order identifier
+          required: true
+  resources:
+    - uri: inventory://warehouse/default
+      name: warehouse-inventory
+      title: Warehouse inventory
+      description: Inventory projection exposed through MCP
+      mimeType: application/json
+  tools:
+    - name: lookupOrder
+      title: Lookup order
+      description: Retrieve order details by id
+      inputSchema: '{"type":"object","properties":{"orderId":{"type":"string"}},"required":["orderId"]}'
+      outputSchema: '{"type":"object","properties":{"order":{"type":"object"}}}'

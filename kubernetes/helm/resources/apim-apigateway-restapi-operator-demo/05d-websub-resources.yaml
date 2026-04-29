@@ -1,0 +1,14 @@
+apiVersion: gateway.api-platform.wso2.com/v1alpha1
+kind: WebSubApi
+metadata:
+  name: demo-websub-apim
+  namespace: apigateway-demo-apim
+  labels:
+    gateway.api-platform.wso2.com/restapi-target: wso2-crd-apim
+spec:
+  displayName: demo-websub-apim
+  version: v1.0
+  context: /websub-demo-apim
+  hub:
+    channels:
+      - name: orders.created

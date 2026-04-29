@@ -32,6 +32,30 @@ kubectl apply -f 02-apigateway.yaml
 kubectl apply -f 03-backend.yaml
 # Wait for the gateway Helm workloads to become Ready.
 kubectl apply -f 04-restapi.yaml
+# Applies executable CRs for management resources.
+kubectl apply -f 05-management-resources.yaml
+```
+
+To execute management flows separately, apply split manifests instead:
+
+```bash
+# Shared prerequisites (Secret + ManagedSecret)
+kubectl apply -f 05a-management-prerequisites.yaml
+
+# LLM flow
+kubectl apply -f 05b-llm-resources.yaml
+
+# MCP flow (includes prompts/resources/tools sample artifacts)
+kubectl apply -f 05c-mcp-resources.yaml
+
+# WebSub flow
+kubectl apply -f 05d-websub-resources.yaml
+
+# Certificate flow
+kubectl apply -f 05e-certificate-resources.yaml
+
+# ApiKey + SubscriptionPlan + Subscription flow
+kubectl apply -f 05f-subscription-resources.yaml
 ```
 
 ## Verification
@@ -55,7 +79,13 @@ kubectl get deploy,svc,pods -n apigateway-demo -l 'app.kubernetes.io/instance=re
 kubectl get restapi hello-normal-api -n apigateway-demo -o yaml
 ```
 
-4. Invoke via gateway-runtime Service (HTTPS may be enabled in your default gateway values; use `-k` if needed):
+4. Check management-resource CR status:
+
+```bash
+kubectl get llmprovidertemplate,llmprovider,llmproxy,mcp,websubapi,managedsecret,certificate,apikey,subscriptionplan,subscription -n apigateway-demo
+```
+
+5. Invoke via gateway-runtime Service (HTTPS may be enabled in your default gateway values; use `-k` if needed):
 
 ```bash
 curl --request GET \

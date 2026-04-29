@@ -1,0 +1,46 @@
+apiVersion: gateway.api-platform.wso2.com/v1alpha1
+kind: ApiKey
+metadata:
+  name: demo-restapi-apikey
+  namespace: apigateway-demo
+  labels:
+    gateway.api-platform.wso2.com/restapi-target: wso2-crd
+spec:
+  parentRef:
+    kind: RestApi
+    name: hello-normal-api
+  displayName: demo key for rest api parent
+  expiresIn:
+    duration: 30
+    unit: days
+---
+apiVersion: gateway.api-platform.wso2.com/v1alpha1
+kind: SubscriptionPlan
+metadata:
+  name: demo-plan
+  namespace: apigateway-demo
+  labels:
+    gateway.api-platform.wso2.com/restapi-target: wso2-crd
+spec:
+  planName: demo-plan
+  status: ACTIVE
+  stopOnQuotaReach: true
+  throttleLimitCount: 1000
+  throttleLimitUnit: minutes
+---
+apiVersion: gateway.api-platform.wso2.com/v1alpha1
+kind: Subscription
+metadata:
+  name: demo-subscription
+  namespace: apigateway-demo
+  labels:
+    gateway.api-platform.wso2.com/restapi-target: wso2-crd
+spec:
+  apiId: hello-normal-api
+  subscriptionPlanId: demo-plan
+  status: ACTIVE
+  subscriptionToken:
+    valueFrom:
+      secretKeyRef:
+        name: demo-management-secrets
+        key: subscription-token

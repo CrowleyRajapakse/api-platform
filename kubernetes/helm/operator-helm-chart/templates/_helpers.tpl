@@ -116,6 +116,16 @@ Common RBAC rules shared between ClusterRole (global) and Role (scoped)
   - gateway.api-platform.wso2.com
   resources:
   - restapis
+  - llmproviders
+  - llmprovidertemplates
+  - llmproxies
+  - mcps
+  - websubapis
+  - managedsecrets
+  - certificates
+  - apikeys
+  - subscriptionplans
+  - subscriptions
   verbs:
   - create
   - delete
@@ -128,12 +138,32 @@ Common RBAC rules shared between ClusterRole (global) and Role (scoped)
   - gateway.api-platform.wso2.com
   resources:
   - restapis/finalizers
+  - llmproviders/finalizers
+  - llmprovidertemplates/finalizers
+  - llmproxies/finalizers
+  - mcps/finalizers
+  - websubapis/finalizers
+  - managedsecrets/finalizers
+  - certificates/finalizers
+  - apikeys/finalizers
+  - subscriptionplans/finalizers
+  - subscriptions/finalizers
   verbs:
   - update
 - apiGroups:
   - gateway.api-platform.wso2.com
   resources:
   - restapis/status
+  - llmproviders/status
+  - llmprovidertemplates/status
+  - llmproxies/status
+  - mcps/status
+  - websubapis/status
+  - managedsecrets/status
+  - certificates/status
+  - apikeys/status
+  - subscriptionplans/status
+  - subscriptions/status
   verbs:
   - get
   - patch
