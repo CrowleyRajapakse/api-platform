@@ -149,6 +149,23 @@ func TestCheck_EveryUpstreamShape(t *testing.T) {
 	}
 }
 
+// A gateway-wide Backend's endpoints are upstream URLs the router dials, so they are checked like
+// any other; the field names the refused endpoint.
+func TestCheckArtifact_BackendEndpoints(t *testing.T) {
+	g := guard(t, netguard.GuardConfig{Enabled: true})
+	backend := map[string]any{"spec": map[string]any{"endpoints": []any{
+		map[string]any{"url": "http://ok.example.com:9080"},
+		map[string]any{"url": "http://169.254.169.254"},
+	}}}
+	if got := refusedField(t, g.CheckArtifact(string(models.KindBackend), backend)); got != "spec.endpoints[1].url" {
+		t.Errorf("refused field = %q, want spec.endpoints[1].url", got)
+	}
+	ok := map[string]any{"spec": map[string]any{"endpoints": []any{map[string]any{"url": "http://ok.example.com:9080"}}}}
+	if err := g.CheckArtifact(string(models.KindBackend), ok); err != nil {
+		t.Fatalf("positive control: a permitted endpoint is accepted: %v", err)
+	}
+}
+
 func TestCheck_HostRuleModes(t *testing.T) {
 	deny := guard(t, netguard.GuardConfig{Enabled: true, Mode: netguard.ModeDeny, Hostnames: []string{`[a-z]+\.internal\.example`}})
 	if refusedField(t, deny.Check(restAPI("https://billing.internal.example/v1"))) == "" {
