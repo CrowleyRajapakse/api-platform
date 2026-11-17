@@ -164,3 +164,25 @@ func TestEngineError_UnrenderedBodyStillCarriesTheCorrelationIDWhenTheKindIsDisa
 	assert.NotContains(t, body, "code",
 		"an unenabled kind must not gain the rendered envelope")
 }
+
+// A request routed to a Backend the gateway lacks reaches the fault policies as engine code
+// 905008, and its reply keeps the analytics the request's policies already collected.
+func TestEngineError_BackendUnavailableReachesFaultPoliciesAndKeepsAnalytics(t *testing.T) {
+	var order []string
+	var saw policy.FaultContext
+	ec := faultExecCtx(t, []policy.Policy{
+		&faultRecorderPolicy{name: "notify", order: &order, sawErrCtx: &saw},
+	}, specs(1))
+	ec.analyticsMetadata["captured_by_policy"] = "kept"
+
+	resp := ec.handleBackendUnavailable(context.Background(), &backendUnavailableError{name: "tenant-gone"}, "request_headers")
+
+	require.Equal(t, []string{"notify"}, order)
+	require.NotNil(t, saw.Fault)
+	assert.Equal(t, "905008", saw.Fault.Code)
+	assert.Equal(t, policy.FaultTypeUpstream, saw.Fault.Type)
+	assert.Equal(t, int32(http.StatusServiceUnavailable), int32(resp.GetImmediateResponse().GetStatus().GetCode()))
+
+	require.NotNil(t, resp.GetDynamicMetadata(), "the reply carries the collected analytics")
+	assert.Contains(t, resp.GetDynamicMetadata().String(), "kept")
+}

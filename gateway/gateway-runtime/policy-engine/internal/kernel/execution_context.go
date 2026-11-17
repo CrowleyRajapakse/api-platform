@@ -491,6 +491,70 @@ func (ec *PolicyExecutionContext) handlePayloadTooLarge(
 	})
 }
 
+// handleBackendUnavailable builds a 503 for a request a policy routed to a global Backend
+// this gateway does not hold — a fixed target that is not deployed yet, or one removed while
+// the request was in flight. The client payload stays generic; the Backend name goes to the
+// log under the correlation id.
+func (ec *PolicyExecutionContext) handleBackendUnavailable(
+	ctx context.Context,
+	missing *backendUnavailableError,
+	phase string,
+) *extprocv3.ProcessingResponse {
+	errorID := uuid.New().String()
+
+	slog.WarnContext(ctx, "Rejecting request: routed to a global Backend this gateway does not hold",
+		"error_id", errorID,
+		"request_id", ec.requestID,
+		"phase", phase,
+		"route_key", ec.routeKey,
+		"backend", missing.name,
+	)
+
+	resp := ec.engineError(ctx, engineFailure{
+		errorID: errorID,
+		status:  http.StatusServiceUnavailable,
+		body:    fmt.Sprintf(`{"error":"Service Unavailable","error_id":"%s"}`, errorID),
+		reason:  constants.TerminalReasonBackendUnavailable,
+		err: &policy.FaultDetails{
+			Code:      codeBackendUnavailable,
+			Type:      policy.FaultTypeUpstream,
+			Direction: policy.DirectionRequest,
+			Message:   "The upstream service is unavailable.",
+		},
+	})
+	// Routing fails after the request's policies ran, so keep the analytics they collected
+	// (for example the captured request headers) on the reply, as a policy rejection does.
+	if len(ec.analyticsMetadata) > 0 {
+		analyticsData := make(map[string]any, len(ec.analyticsMetadata))
+		for key, value := range ec.analyticsMetadata {
+			analyticsData[key] = value
+		}
+		analyticsStruct, err := buildAnalyticsStruct(analyticsData, ec)
+		if err != nil {
+			slog.WarnContext(ctx, "Failed to attach analytics to the backend-unavailable response",
+				"error_id", errorID, "error", err)
+		} else {
+			resp.DynamicMetadata = buildDynamicMetadata(analyticsStruct, nil, nil)
+		}
+	}
+	return resp
+}
+
+// failClosedOnUnavailableBackend turns a request translation that routed to a missing global
+// Backend into a 503, and passes every other outcome through unchanged.
+func (ec *PolicyExecutionContext) failClosedOnUnavailableBackend(
+	ctx context.Context,
+	phase string,
+	resp *extprocv3.ProcessingResponse,
+	err error,
+) (*extprocv3.ProcessingResponse, error) {
+	var missing *backendUnavailableError
+	if errors.As(err, &missing) {
+		return ec.handleBackendUnavailable(ctx, missing, phase), nil
+	}
+	return resp, err
+}
+
 // engineFailure describes a failure the engine itself produced, as opposed to one a policy
 // produced or one the router reported.
 type engineFailure struct {
@@ -1042,7 +1106,8 @@ func (ec *PolicyExecutionContext) processRequestHeaders(
 	if f, isFault := faultFromRequestHeaders(execResult); isFault {
 		ec.handleFault(ctx, f)
 	}
-	return TranslateRequestHeaderActions(execResult, ec.policyChain, ec)
+	resp, err := TranslateRequestHeaderActions(execResult, ec.policyChain, ec)
+	return ec.failClosedOnUnavailableBackend(ctx, "request_headers", resp, err)
 }
 
 // responseHasNoBody returns true when the response carries no body and Envoy will not
@@ -1147,7 +1212,8 @@ func (ec *PolicyExecutionContext) processRequestBodyForEmptyRequest(
 	if f, isFault := faultFromRequestBody(bodyResult); isFault {
 		ec.handleFault(ctx, f)
 	}
-	return TranslateRequestHeaderActionsWithBodyMerge(headerResult, bodyResult, ec)
+	resp, err := TranslateRequestHeaderActionsWithBodyMerge(headerResult, bodyResult, ec)
+	return ec.failClosedOnUnavailableBackend(ctx, "request_body_no_body", resp, err)
 }
 
 // processResponseBodyForEmptyResponse executes body policies inline during the response-headers
@@ -1265,7 +1331,8 @@ func (ec *PolicyExecutionContext) processRequestBody(
 		if f, isFault := faultFromRequestBody(execResult); isFault {
 			ec.handleFault(ctx, f)
 		}
-		return TranslateRequestBodyActions(execResult, ec.policyChain, ec)
+		resp, err := TranslateRequestBodyActions(execResult, ec.policyChain, ec)
+		return ec.failClosedOnUnavailableBackend(ctx, "request_body", resp, err)
 	}
 
 	return &extprocv3.ProcessingResponse{
